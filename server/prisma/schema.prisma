@@ -1,0 +1,131 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  RECEPTIONIST
+  DOCTOR
+  ADMIN
+}
+
+enum PatientStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AppointmentType {
+  CONSULTATION
+  FOLLOW_UP
+  CHECKUP
+  EMERGENCY
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         String    @default("RECEPTIONIST") // RECEPTIONIST, DOCTOR, ADMIN
+  avatar       String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  doctorProfile Doctor?
+}
+
+model Doctor {
+  id                  String         @id @default(uuid())
+  userId              String         @unique
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialization      String
+  licenseNumber       String
+  consultationFee     Float          @default(50.0)
+  phone               String?
+  bio                 String?
+  workingDays         String         @default("Monday,Tuesday,Wednesday,Thursday,Friday")
+  slotDurationMinutes Int            @default(30)
+  startTime           String         @default("09:00")
+  endTime             String         @default("17:00")
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  appointments        Appointment[]
+  clinicalNotes       ClinicalNote[]
+}
+
+model Patient {
+  id                    String        @id @default(uuid())
+  patientCode           String        @unique
+  firstName             String
+  lastName              String
+  dateOfBirth           String        // YYYY-MM-DD
+  gender                String        // Male, Female, Other
+  phone                 String
+  email                 String?
+  address               String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  bloodGroup            String?       // A+, A-, B+, B-, AB+, AB-, O+, O-
+  allergies             String?       // Comma separated or text
+  medicalHistory        String?       // Pre-existing conditions
+  status                String        @default("ACTIVE") // ACTIVE, INACTIVE, ARCHIVED
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  appointments          Appointment[]
+  clinicalNotes         ClinicalNote[]
+}
+
+model Appointment {
+  id                 String         @id @default(uuid())
+  appointmentCode    String         @unique
+  patientId          String
+  patient            Patient        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId           String
+  doctor             Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  appointmentDate    String         // YYYY-MM-DD
+  startTime          String         // HH:mm (e.g. 09:30)
+  endTime            String         // HH:mm (e.g. 10:00)
+  status             String         @default("SCHEDULED") // SCHEDULED, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW
+  type               String         @default("CONSULTATION") // CONSULTATION, FOLLOW_UP, CHECKUP, EMERGENCY
+  reason             String
+  notes              String?
+  cancellationReason String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  clinicalNote       ClinicalNote?
+}
+
+model ClinicalNote {
+  id              String        @id @default(uuid())
+  appointmentId   String?       @unique
+  appointment     Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  patientId       String
+  patient         Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId        String
+  doctor          Doctor        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  diagnosis       String
+  symptoms        String?
+  prescription    String?       // Drug name, dosage, frequency
+  vitalSigns      String?       // JSON { bloodPressure, heartRate, temperature, respiratoryRate, oxygenSat, weightKg, heightCm }
+  clinicalSummary String?
+  followUpDate    String?       // YYYY-MM-DD
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
